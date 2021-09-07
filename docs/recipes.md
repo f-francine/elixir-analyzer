@@ -36,40 +36,22 @@ end
 ## Find usage of list comprehensions
 
 ```elixir
-assert_all "description" do
+assert_call "description" do
   called_fn name: :for
 end
 ```
 
 ## Assert no usage of a specific module
 
-Note: simplified version for a module with a single-segment name like `List` or `Enum`.
+This is trivial with `assert_(no_)call` because it tracks imports and aliases.
 
 ```elixir
 assert_no_call "does not call any ModuleName functions" do
   called_fn module: ModuleName, name: :_
 end
-
-feature "does not alias or import ModuleName" do
-  find :none
-   
-  form do
-    import ModuleName
-  end
-
-  form do
-    use ModuleName
-  end
-   
-  form do
-    import ModuleName, _ignore
-  end
-    
-  form do
-    alias ModuleName, as: _ignore
-  end
-end
 ```
+
+Note that tracking imports only works for standard library modules, not user-defined modules.
 
 ## Find module attribute with given value and any name
 
@@ -91,6 +73,44 @@ feature "description" do
 
   form do
     @some_name _ignore
+  end
+end
+```
+
+## Asserting two function calls in a block appear in order
+
+This check will also pass if there are other function calls in between, before, or after.
+
+```elixir
+feature "description" do
+  find :any
+
+  form do
+    def read_file(_ignore) do
+      _block_includes do
+        _ignore = File.open(_ignore)
+        File.close(_ignore)
+      end
+    end
+  end
+end
+```
+
+## Asserting that a block finished with a specific function 
+
+This check will also pass if there are other function calls in between or before (but not after). When used to match a single line, make sure to place `_block_ends_with` inside a context (like a module or function definition) as in the example below.
+
+```elixir
+feature "description" do
+  find :any
+
+  form do
+    def read_file(_ignore) do
+      _block_ends_with do
+        _ignore = File.open(_ignore)
+        File.close(_ignore)
+      end
+    end
   end
 end
 ```

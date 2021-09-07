@@ -133,7 +133,123 @@ end
 
 `_ignore` will match any node in the AST. In some special cases, that might be too permissive. You can use `_shallow_ignore` to match any node (name and metadata), but continue matching its children.
 
-##### 2.1 Limitations
+##### 2.1 The `_block_includes` feature
+
+The `_block_includes` feature can be used inside of `form` to match a number of lines inside of a block of code. The block of code may contain other lines before, after or between the lines you are trying to match. The order of the lines needs to be the same.
+
+For example, the following feature
+
+```elixir
+feature "opens and closes the resource" do
+  form do
+    _block_includes do
+      _ignore = open(resource)
+      close(resource)
+    end
+  end
+end
+
+```
+
+will match the following function
+
+```elixir
+def write(resource, content) do
+  pipe = open(resource)
+  dump_content(pipe, content)
+  |> flush()
+  close(resource)
+  :ok
+end
+```
+
+Note that `_block_includes` consumes all the lines of a block of code, so it cannot be used right before or after another match.
+
+```elixir
+# do not use _block_includes in this way
+form do
+  _block_includes do
+    _ignore = open(resource)
+    close(resource)
+  end
+  # the following line can never match because _block_includes has consumed the full block
+  :ok
+end
+```
+
+##### 2.2 The `_block_ends_with` feature
+
+The `_block_ends_with` feature is very similar to `_block_includes`, the only difference is that the last line of `_block_ends_with` must match the last line of the code being matched.
+
+For example, the following feature
+
+```elixir
+feature "opens and closes the resource" do
+  form do
+    _block_ends_with do
+      _ignore = open(resource)
+      close(resource)
+    end
+  end
+end
+
+```
+
+will match the following function
+
+```elixir
+def write(resource, content) do
+  pipe = open(resource)
+  dump_content(pipe, content)
+  |> flush()
+  close(resource)
+end
+```
+
+but would not match the `_block_includes` example above ending with `:ok`.
+
+`_block_ends_with` also consumes all the lines of a block of code, so it cannot be used right before or after another match, just like `_block_includes`.
+
+Additionally, when trying to match a single line, if `_block_includes` is not placed within a context (module, function...) the line will match even if it's not the last in the code.
+
+For example
+
+```elixir
+# do not use _block_ends_with in this way
+form do
+  # No context given, _block_ends_with will attempt to match line by line
+  _block_ends_with do
+    close(resource)
+  end
+end
+```
+
+will match
+
+```elixir
+def write(resource, content) do
+  pipe = open(resource)
+  dump_content(pipe, content)
+  |> flush()
+  close(resource)
+  :ok
+end
+```
+
+Instead, use
+
+```elixir
+form do
+  def write(_ignore, _ignore) do
+    _block_ends_with do
+      close(resource)
+    end
+  end
+end
+```
+
+
+##### 2.3 Limitations
 
 Slightly different syntax can produce exactly the same AST. That means that certain details cannot be distinguished by this analyzer. If they cannot be distinguished, they cannot be verified by the analyzer, but they also don't need to be both listed when specifying all of the forms for a feature.
 

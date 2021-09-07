@@ -3,6 +3,7 @@ defmodule ElixirAnalyzer.ExerciseTest.Feature.Compiler do
 
   alias ElixirAnalyzer.QuoteUtil
   alias ElixirAnalyzer.Comment
+  alias ElixirAnalyzer.ExerciseTest.Feature.Compiler
 
   def compile({feature_data, feature_forms}, code_ast) do
     name = Keyword.fetch!(feature_data, :name)
@@ -46,10 +47,10 @@ defmodule ElixirAnalyzer.ExerciseTest.Feature.Compiler do
   end
 
   def compile_form(form, find_at_depth, code_ast) do
-    find_ast_string = Keyword.fetch!(form, :find_ast_string)
+    find_ast = Keyword.fetch!(form, :find_ast)
     block_params = Keyword.fetch!(form, :block_params)
 
-    find_ast = Code.string_to_quoted!(find_ast_string)
+    find_ast = Macro.escape(find_ast)
 
     # create the walk function, determined if the form to find
     # is multiple first level entries in a code block
@@ -80,7 +81,7 @@ defmodule ElixirAnalyzer.ExerciseTest.Feature.Compiler do
               |> Enum.chunk_every(unquote(block_params), 1, :discard)
               |> Enum.reduce(false, fn
                 chunk, false ->
-                  match?(unquote(find_ast), chunk)
+                  Compiler.form_match?(unquote(find_ast), chunk)
 
                 _chunk, true ->
                   true
@@ -106,7 +107,7 @@ defmodule ElixirAnalyzer.ExerciseTest.Feature.Compiler do
           finding_depth = unquote(find_at_depth) in [nil, depth]
 
           if finding_depth do
-            {node, match?(unquote(find_ast), node)}
+            {node, Compiler.form_match?(unquote(find_ast), node)}
           else
             {node, false}
           end
@@ -160,5 +161,134 @@ defmodule ElixirAnalyzer.ExerciseTest.Feature.Compiler do
       type when type in [:none] -> quote do: unquote(combined_expr) == 0
       type when type in [:one] -> quote do: unquote(combined_expr) == 1
     end
+  end
+
+  def form_match?(item, item) do
+    true
+  end
+
+  def form_match?({:_ignore, _, _}, _) do
+    true
+  end
+
+  def form_match?({:_shallow_ignore, _, form_params}, {_, _, params}) do
+    form_match?(form_params, params)
+  end
+
+  def form_match?([:_ignore], meta) when is_list(meta) do
+    true
+  end
+
+  def form_match?(
+        {:_block_includes, _, [[do: {:__block__, _, form_params}]]},
+        {:__block__, _, params}
+      ) do
+    all_forms_are_found?(form_params, params)
+  end
+
+  def form_match?({:_block_includes, _, [[do: form_params]]}, params)
+      when is_list(form_params) do
+    all_forms_are_found?(form_params, params)
+  end
+
+  def form_match?({:_block_includes, _, [[do: form_params]]}, params) do
+    case params do
+      {:__block__, _, params} ->
+        Enum.any?(params, fn param -> form_match?(form_params, param) end)
+
+      _ ->
+        form_match?(form_params, params)
+    end
+  end
+
+  def form_match?(
+        {:_block_ends_with, _, [[do: {:__block__, _, form_params}]]},
+        {:__block__, _, params}
+      ) do
+    form_match?(List.last(form_params), List.last(params)) and
+      all_forms_are_found?(form_params, params)
+  end
+
+  def form_match?({:_block_ends_with, _, [[do: form_params]]}, params)
+      when is_list(form_params) do
+    form_match?(List.last(form_params), List.last(List.wrap(params))) and
+      all_forms_are_found?(form_params, params)
+  end
+
+  def form_match?({:_block_ends_with, _, [[do: form_params]]}, params) do
+    case params do
+      {:__block__, _, block_params} ->
+        form_match?(form_params, List.last(block_params))
+
+      _ ->
+        form_match?(form_params, List.last(List.wrap(params)))
+    end
+  end
+
+  # Pipes are a special case, when pipes are in the form, they must be in the code
+  def form_match?({:|>, form_meta, [form_params, form_function]}, line) do
+    case line do
+      {:|>, meta, [params, function]} ->
+        form_function = add_parens_to_end_of_pipe(form_function)
+        function = add_parens_to_end_of_pipe(function)
+
+        form_match?(form_meta, meta) and form_match?(form_params, params) and
+          form_match?(form_function, function)
+
+      _ ->
+        false
+    end
+  end
+
+  # When pipes are not in the form but in the code, we un-pipe the code
+  def form_match?(form_params, {:|>, _, [params, {function, function_meta, function_params}]}) do
+    if is_atom(function_params) do
+      form_match?(form_params, {function, function_meta, List.wrap(params)})
+    else
+      form_match?(form_params, {function, function_meta, [params | function_params]})
+    end
+  end
+
+  def form_match?(form_params, params) when is_list(form_params) and is_list(params) do
+    length(form_params) == length(params) and
+      Enum.zip_with(form_params, params, &form_match?/2)
+      |> Enum.all?()
+  end
+
+  def form_match?({form_name, form_meta, form_params}, {name, meta, params}) do
+    form_match?(form_name, name) and
+      form_match?(form_meta, meta) and
+      form_match?(form_params, params)
+  end
+
+  def form_match?({form_a, form_b}, {a, b}) do
+    form_match?(form_a, a) and form_match?(form_b, b)
+  end
+
+  def form_match?(_, _) do
+    false
+  end
+
+  defp all_forms_are_found?(form_params, params) when is_list(form_params) and is_list(params) do
+    Enum.reduce_while(params, form_params, fn
+      _, [] ->
+        {:halt, []}
+
+      line, [form_head | form_tail] = form ->
+        {:cont, if(form_match?(form_head, line), do: form_tail, else: form)}
+    end)
+    |> Enum.empty?()
+  end
+
+  defp all_forms_are_found?(form_params, _params) when is_list(form_params) do
+    false
+  end
+
+  defp add_parens_to_end_of_pipe({name, meta, module}) when is_atom(module) do
+    {name, meta, []}
+  end
+
+  defp add_parens_to_end_of_pipe(node) do
+    node
   end
 end

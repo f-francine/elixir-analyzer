@@ -16,6 +16,7 @@ defmodule ElixirAnalyzer.ExerciseTestCase do
   using opts do
     quote do
       @exercise_test_module unquote(opts)[:exercise_test_module]
+      @unsorted_comments unquote(opts)[:unsorted_comments]
       require ElixirAnalyzer.ExerciseTestCase
       import ElixirAnalyzer.ExerciseTestCase
       alias ElixirAnalyzer.Constants
@@ -33,7 +34,7 @@ defmodule ElixirAnalyzer.ExerciseTestCase do
       defmodule TwoFer do
         @spec two_fer(String.t()) :: String.t()
         def two_fer(name \\ "you") when is_binary(name) do
-          "One for #{name}, one for me"
+          "One for #{name}, one for me."
         end
       end
     end
@@ -58,9 +59,7 @@ defmodule ElixirAnalyzer.ExerciseTestCase do
     assertions_key_diff = assertions_keys -- supported_assertions_keys
 
     if assertions_keys == [] do
-      raise "Expected to receive at least one of the supported assertions: #{
-              Enum.join(supported_assertions_keys)
-            }"
+      raise "Expected to receive at least one of the supported assertions: #{Enum.join(supported_assertions_keys)}"
     end
 
     if assertions_key_diff != [] do
@@ -78,7 +77,11 @@ defmodule ElixirAnalyzer.ExerciseTestCase do
           _ -> name
         end
 
-      {_, [line: line], _} = code
+      {line, code} =
+        case code do
+          {_, [line: line], _} -> {line, Macro.to_string(code)}
+          _ -> {__CALLER__.line, code}
+        end
 
       quote line: line do
         test "#{unquote(test_name)}" do
@@ -89,29 +92,35 @@ defmodule ElixirAnalyzer.ExerciseTestCase do
             analysis_module: ""
           }
 
-          result =
-            @exercise_test_module.analyze(
-              empty_submission,
-              unquote(Macro.to_string(code))
-            )
+          result = @exercise_test_module.analyze(empty_submission, unquote(code))
 
           comments =
             result.comments
             |> Enum.map(fn comment_details -> comment_details.comment end)
 
-          Enum.map(Keyword.keys(unquote(assertions)), fn key ->
-            assert_comments(comments, key, unquote(assertions))
+          Enum.map(Keyword.keys(unquote(assertions)), fn
+            :comments ->
+              assert_comments(comments, :comments, unquote(assertions),
+                unsorted: @unsorted_comments
+              )
+
+            key ->
+              assert_comments(comments, key, unquote(assertions))
           end)
         end
       end
     end)
   end
 
-  def assert_comments(comments, :comments, assertions) do
+  def assert_comments(comments, :comments, assertions, unsorted: unsorted) do
     expected_comments = assertions[:comments]
 
-    if expected_comments do
-      assert Enum.sort(comments) == Enum.sort(expected_comments)
+    cond do
+      expected_comments && unsorted ->
+        assert comments == expected_comments
+
+      expected_comments ->
+        assert Enum.sort(comments) == Enum.sort(expected_comments)
     end
   end
 

@@ -30,6 +30,12 @@ config :elixir_analyzer,
     "boutique-suggestions" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.BoutiqueSuggestions
     },
+    "chessboard" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.Chessboard
+    },
+    "file-sniffer" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.FileSniffer
+    },
     "freelancer-rates" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.FreelancerRates
     },
@@ -45,8 +51,26 @@ config :elixir_analyzer,
     "lasagna" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.Lasagna
     },
+    "name-badge" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.NameBadge
+    },
+    "need-for-speed" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.NeedForSpeed
+    },
+    "newsletter" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.Newsletter
+    },
     "pacman-rules" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.PacmanRules
+    },
+    "rpg-character-sheet" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.RpgCharacterSheet
+    },
+    "rpn-calculator-inspection" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.RpnCalculatorInspection
+    },
+    "rpn-calculator-output" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.RpnCalculatorOutput
     },
     "take-a-number" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.TakeANumber
@@ -55,6 +79,12 @@ config :elixir_analyzer,
     # practice exercises
     "accumulate" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.Accumulate
+    },
+    "list-ops" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.ListOps
+    },
+    "square-root" => %{
+      analyzer_module: ElixirAnalyzer.TestSuite.SquareRoot
     },
     "two-fer" => %{
       analyzer_module: ElixirAnalyzer.TestSuite.TwoFer
