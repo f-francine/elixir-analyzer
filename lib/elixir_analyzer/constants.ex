@@ -23,6 +23,7 @@ defmodule ElixirAnalyzer.Constants do
     solution_function_name_snake_case: "elixir.solution.function_name_snake_case",
     solution_variable_name_snake_case: "elixir.solution.variable_name_snake_case",
     solution_indentation: "elixir.solution.indentation",
+    solution_debug_functions: "elixir.solution.debug_functions",
 
     # Concept exercises
 
@@ -59,6 +60,7 @@ defmodule ElixirAnalyzer.Constants do
     high_score_use_module_attribute: "elixir.high-score.use_module_attribute",
     high_score_use_default_argument_with_module_attribute:
       "elixir.high-score.use_default_argument_with_module_attribute",
+    high_score_use_map_update: "elixir.high-score.use_map_update",
 
     # Lasagna Comments
     lasagna_function_reuse: "elixir.lasagna.function_reuse",
